@@ -4,8 +4,6 @@ import {
   ArrowLeft,
   Package,
   Pencil,
-  Plus,
-  Minus,
   Truck,
   Tag,
   CircleDollarSign
@@ -15,6 +13,8 @@ import { connectDB } from '@/lib/mongodb'
 import Product from '@/models/Product'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import DeleteProductButton from '@/components/products/DeleteProductButton'
+import StockAdjustment from '@/components/products/StockAdjustment'
+import ProductInventoryHistory from '@/components/products/ProductInventoryHistory'
 
 async function getProduct(id) {
   await connectDB()
@@ -93,20 +93,24 @@ export default async function ProductDetailsPage({ params }) {
             </p>
           </div>
 
-          <Link
-            href={`/products/${product._id}/edit`}
-            className="flex w-fit items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
-          >
-            <Pencil size={16} />
-            Edit Product
-          </Link>
-          <DeleteProductButton productId={product._id.toString()} />
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/products/${product._id}/edit`}
+              className="flex w-fit items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+            >
+              <Pencil size={16} />
+              Edit Product
+            </Link>
 
+            <DeleteProductButton
+              productId={product._id.toString()}
+            />
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 lg:col-span-1">
-            <div className="flex aspect-square items-center justify-center rounded-xl bg-zinc-800">
+            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-zinc-800">
               {product.image ? (
                 <img
                   src={product.image}
@@ -114,7 +118,10 @@ export default async function ProductDetailsPage({ params }) {
                   className="h-full w-full rounded-xl object-cover"
                 />
               ) : (
-                <Package size={80} className="text-zinc-700" />
+                <Package
+                  size={80}
+                  className="text-zinc-700"
+                />
               )}
             </div>
           </div>
@@ -126,7 +133,8 @@ export default async function ProductDetailsPage({ params }) {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-zinc-500">
-                {product.description || 'No description available.'}
+                {product.description ||
+                  'No description available.'}
               </p>
 
               <div className="mt-6 grid gap-5 sm:grid-cols-2">
@@ -136,7 +144,10 @@ export default async function ProductDetailsPage({ params }) {
                   </div>
 
                   <div>
-                    <p className="text-xs text-zinc-500">Category</p>
+                    <p className="text-xs text-zinc-500">
+                      Category
+                    </p>
+
                     <p className="mt-1 text-sm font-medium text-zinc-200">
                       {product.category}
                     </p>
@@ -149,7 +160,10 @@ export default async function ProductDetailsPage({ params }) {
                   </div>
 
                   <div>
-                    <p className="text-xs text-zinc-500">Supplier</p>
+                    <p className="text-xs text-zinc-500">
+                      Supplier
+                    </p>
+
                     <p className="mt-1 text-sm font-medium text-zinc-200">
                       {product.supplier}
                     </p>
@@ -162,7 +176,10 @@ export default async function ProductDetailsPage({ params }) {
                   </div>
 
                   <div>
-                    <p className="text-xs text-zinc-500">Price</p>
+                    <p className="text-xs text-zinc-500">
+                      Price
+                    </p>
+
                     <p className="mt-1 text-sm font-medium text-zinc-200">
                       Rs. {product.price.toLocaleString()}
                     </p>
@@ -175,7 +192,10 @@ export default async function ProductDetailsPage({ params }) {
                   </div>
 
                   <div>
-                    <p className="text-xs text-zinc-500">SKU</p>
+                    <p className="text-xs text-zinc-500">
+                      SKU
+                    </p>
+
                     <p className="mt-1 text-sm font-medium text-zinc-200">
                       {product.sku}
                     </p>
@@ -185,7 +205,7 @@ export default async function ProductDetailsPage({ params }) {
             </div>
 
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
                 <div>
                   <p className="text-sm text-zinc-500">
                     Current Stock
@@ -200,17 +220,10 @@ export default async function ProductDetailsPage({ params }) {
                   </p>
                 </div>
 
-                <div className="flex gap-2">
-                  <button className="flex items-center gap-2 rounded-lg border border-zinc-800 px-4 py-2.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white">
-                    <Minus size={16} />
-                    Stock Out
-                  </button>
-
-                  <button className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500">
-                    <Plus size={16} />
-                    Stock In
-                  </button>
-                </div>
+                <StockAdjustment
+                  productId={product._id.toString()}
+                  currentStock={product.stock}
+                />
               </div>
             </div>
           </div>
@@ -228,16 +241,23 @@ export default async function ProductDetailsPage({ params }) {
           </div>
 
           <div className="p-6">
-            <div className="rounded-lg border border-dashed border-zinc-800 py-12 text-center">
-              <Package
-                size={32}
-                className="mx-auto text-zinc-700"
-              />
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50">
+              <div className="border-b border-zinc-800 p-6">
+    <h2 className="font-semibold text-white">
+      Inventory History
+    </h2>
 
-              <p className="mt-3 text-sm text-zinc-500">
-                Inventory history will appear here.
-              </p>
+    <p className="mt-1 text-sm text-zinc-500">
+      Recent stock movements for this product.
+    </p>
             </div>
+
+           <div className="p-6">
+           <ProductInventoryHistory
+              productId={product._id.toString()}
+               />
+            </div>
+           </div>
           </div>
         </div>
       </div>
