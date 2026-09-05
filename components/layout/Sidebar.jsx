@@ -44,7 +44,7 @@ export default function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-zinc-800 bg-zinc-950">
+    <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col overflow-y-auto border-r border-zinc-800 bg-zinc-950">
       <div className="flex h-20 items-center border-b border-zinc-800 px-6">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600">
