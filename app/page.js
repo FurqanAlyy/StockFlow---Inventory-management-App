@@ -9,11 +9,14 @@ import {
 
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import StatCard from '@/components/dashboard/StatCard'
+import StockMovementChart from '@/components/dashboard/StockMovementChart'
 import { connectDB } from '@/lib/mongodb'
 import Product from '@/models/Product'
 import Category from '@/models/Category'
 import Supplier from '@/models/Supplier'
 import InventoryMovement from '@/models/InventoryMovement'
+
+export const dynamic = 'force-dynamic'
 
 async function getDashboardData() {
   await connectDB()
@@ -63,6 +66,104 @@ async function getDashboardData() {
     }
   ])
 
+  const chartMovements = await InventoryMovement.find({
+    createdAt: {
+      $gte: new Date(
+        Date.now() - 6 * 24 * 60 * 60 * 1000
+      )
+    }
+  })
+    .select('type quantity createdAt')
+    .lean()
+
+  const movementChart = Array.from(
+    { length: 7 },
+    (_, index) => {
+      const date = new Date()
+
+      date.setDate(date.getDate() - (6 - index))
+
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(
+        2,
+        '0'
+      )
+      const day = String(date.getDate()).padStart(2, '0')
+
+      const dateKey = `${year}-${month}-${day}`
+
+      const stockIn = chartMovements
+        .filter(movement => {
+          if (movement.type !== 'in') {
+            return false
+          }
+
+          const movementDate = new Date(
+            movement.createdAt
+          )
+
+          const movementYear =
+            movementDate.getFullYear()
+
+          const movementMonth = String(
+            movementDate.getMonth() + 1
+          ).padStart(2, '0')
+
+          const movementDay = String(
+            movementDate.getDate()
+          ).padStart(2, '0')
+
+          return (
+            `${movementYear}-${movementMonth}-${movementDay}` ===
+            dateKey
+          )
+        })
+        .reduce(
+          (total, movement) =>
+            total + movement.quantity,
+          0
+        )
+
+      const stockOut = chartMovements
+        .filter(movement => {
+          if (movement.type !== 'out') {
+            return false
+          }
+
+          const movementDate = new Date(
+            movement.createdAt
+          )
+
+          const movementYear =
+            movementDate.getFullYear()
+
+          const movementMonth = String(
+            movementDate.getMonth() + 1
+          ).padStart(2, '0')
+
+          const movementDay = String(
+            movementDate.getDate()
+          ).padStart(2, '0')
+
+          return (
+            `${movementYear}-${movementMonth}-${movementDay}` ===
+            dateKey
+          )
+        })
+        .reduce(
+          (total, movement) =>
+            total + movement.quantity,
+          0
+        )
+
+      return {
+        date: `${month}/${day}`,
+        stockIn,
+        stockOut
+      }
+    }
+  )
+
   return {
     totalProducts,
     lowStockCount,
@@ -74,7 +175,8 @@ async function getDashboardData() {
     totalStock: totalStock[0]?.total || 0,
     recentMovements: JSON.parse(
       JSON.stringify(recentMovements)
-    )
+    ),
+    movementChart
   }
 }
 
@@ -128,51 +230,36 @@ export default async function DashboardPage() {
           />
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 lg:col-span-2">
             <div className="border-b border-zinc-800 p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-semibold text-white">
-                    Stock Overview
+                    Stock Movement
                   </h2>
 
                   <p className="mt-1 text-sm text-zinc-500">
-                    Current inventory levels.
+                    Stock activity over the last 7 days.
                   </p>
                 </div>
 
-                <Package
-                  size={20}
-                  className="text-indigo-400"
-                />
+                <div className="text-right">
+                  <p className="text-xs text-zinc-500">
+                    Total Units
+                  </p>
+
+                  <p className="mt-1 text-lg font-semibold text-white">
+                    {data.totalStock.toLocaleString()}
+                  </p>
+                </div>
               </div>
             </div>
 
             <div className="p-6">
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-sm text-zinc-500">
-                    Total Units in Stock
-                  </p>
-
-                  <p className="mt-2 text-4xl font-semibold text-white">
-                    {data.totalStock.toLocaleString()}
-                  </p>
-                </div>
-
-                <div className="rounded-lg bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-400">
-                  Current Stock
-                </div>
-              </div>
-
-              <div className="mt-6 h-2 overflow-hidden rounded-full bg-zinc-800">
-                <div className="h-full w-full rounded-full bg-indigo-500" />
-              </div>
-
-              <p className="mt-3 text-xs text-zinc-600">
-                Inventory across all products
-              </p>
+              <StockMovementChart
+                data={data.movementChart}
+              />
             </div>
           </div>
 
@@ -198,19 +285,19 @@ export default async function DashboardPage() {
                 data.lowStockProducts.map(product => (
                   <div
                     key={product._id}
-                    className="flex items-center justify-between px-6 py-4"
+                    className="flex items-center justify-between gap-3 px-6 py-4"
                   >
-                    <div>
-                      <p className="text-sm font-medium text-white">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-white">
                         {product.name}
                       </p>
 
-                      <p className="mt-1 text-xs text-zinc-500">
+                      <p className="mt-1 truncate text-xs text-zinc-500">
                         {product.sku}
                       </p>
                     </div>
 
-                    <div className="text-right">
+                    <div className="shrink-0 text-right">
                       <p className="text-sm font-semibold text-amber-400">
                         {product.stock} units
                       </p>

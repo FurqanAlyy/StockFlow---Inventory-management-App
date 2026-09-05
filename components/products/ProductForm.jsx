@@ -2,7 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ImagePlus, Loader2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  ImagePlus,
+  Loader2,
+  X
+} from 'lucide-react'
 import Link from 'next/link'
 
 export default function ProductForm({
@@ -23,6 +28,11 @@ export default function ProductForm({
     image: initialData?.image || ''
   })
 
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [preview, setPreview] = useState(
+    initialData?.image || ''
+  )
+  const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -35,6 +45,71 @@ export default function ProductForm({
     }))
   }
 
+  function handleImageChange(event) {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size must be less than 5MB')
+      return
+    }
+
+    setError('')
+    setSelectedFile(file)
+
+    const imageUrl = URL.createObjectURL(file)
+
+    setPreview(imageUrl)
+  }
+
+  function removeImage() {
+    setSelectedFile(null)
+    setPreview('')
+    setForm(prev => ({
+      ...prev,
+      image: ''
+    }))
+  }
+
+  async function uploadImage() {
+    if (!selectedFile) {
+      return form.image
+    }
+
+    const formData = new FormData()
+
+    formData.append('file', selectedFile)
+
+    setUploading(true)
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'Failed to upload image'
+        )
+      }
+
+      return data.url
+    } finally {
+      setUploading(false)
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
 
@@ -42,6 +117,8 @@ export default function ProductForm({
     setError('')
 
     try {
+      const imageUrl = await uploadImage()
+
       const url = isEdit
         ? `/api/products/${initialData._id}`
         : '/api/products'
@@ -55,6 +132,7 @@ export default function ProductForm({
         },
         body: JSON.stringify({
           ...form,
+          image: imageUrl,
           price: Number(form.price),
           stock: Number(form.stock),
           minimumStock: Number(form.minimumStock)
@@ -66,7 +144,7 @@ export default function ProductForm({
       if (!response.ok) {
         throw new Error(
           data.message ||
-          `Failed to ${isEdit ? 'update' : 'create'} product`
+            `Failed to ${isEdit ? 'update' : 'create'} product`
         )
       }
 
@@ -87,7 +165,11 @@ export default function ProductForm({
   return (
     <div className="max-w-4xl">
       <Link
-        href={isEdit ? `/products/${initialData._id}` : '/products'}
+        href={
+          isEdit
+            ? `/products/${initialData._id}`
+            : '/products'
+        }
         className="mb-6 inline-flex items-center gap-2 text-sm text-zinc-500 transition hover:text-white"
       >
         <ArrowLeft size={16} />
@@ -106,7 +188,10 @@ export default function ProductForm({
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-6"
+      >
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
           <h2 className="text-lg font-semibold text-white">
             Basic Information
@@ -256,23 +341,54 @@ export default function ProductForm({
 
             <div>
               <label className="mb-2 block text-sm font-medium text-zinc-300">
-                Product Image URL
+                Product Image
               </label>
 
-              <div className="relative">
-                <ImagePlus
-                  size={18}
-                  className="absolute left-4 top-3.5 text-zinc-600"
-                />
+              {preview ? (
+                <div className="relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
+                  <img
+                    src={preview}
+                    alt="Product preview"
+                    className="h-64 w-full object-contain"
+                  />
 
-                <input
-                  name="image"
-                  value={form.image}
-                  onChange={handleChange}
-                  placeholder="https://..."
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-3 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-indigo-500"
-                />
-              </div>
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    disabled={loading}
+                    className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-lg bg-black/70 text-white transition hover:bg-red-500 disabled:opacity-50"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-zinc-700 bg-zinc-950 px-6 py-12 transition hover:border-indigo-500 hover:bg-zinc-900">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
+                    <ImagePlus size={24} />
+                  </div>
+
+                  <p className="mt-4 text-sm font-medium text-zinc-300">
+                    Click to upload an image
+                  </p>
+
+                  <p className="mt-1 text-xs text-zinc-600">
+                    PNG, JPG, WEBP up to 5MB
+                  </p>
+
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </label>
+              )}
+
+              {selectedFile && (
+                <p className="mt-2 text-xs text-zinc-500">
+                  Selected: {selectedFile.name}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -285,7 +401,11 @@ export default function ProductForm({
 
         <div className="flex justify-end gap-3">
           <Link
-            href={isEdit ? `/products/${initialData._id}` : '/products'}
+            href={
+              isEdit
+                ? `/products/${initialData._id}`
+                : '/products'
+            }
             className="rounded-lg border border-zinc-800 px-5 py-2.5 text-sm font-medium text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
           >
             Cancel
@@ -293,20 +413,25 @@ export default function ProductForm({
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || uploading}
             className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading && (
-              <Loader2 size={16} className="animate-spin" />
+            {(loading || uploading) && (
+              <Loader2
+                size={16}
+                className="animate-spin"
+              />
             )}
 
-            {loading
-              ? isEdit
-                ? 'Saving...'
-                : 'Adding...'
-              : isEdit
-                ? 'Save Changes'
-                : 'Add Product'}
+            {uploading
+              ? 'Uploading Image...'
+              : loading
+                ? isEdit
+                  ? 'Saving...'
+                  : 'Adding...'
+                : isEdit
+                  ? 'Save Changes'
+                  : 'Add Product'}
           </button>
         </div>
       </form>
