@@ -1,17 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ClipboardList,
-  Loader2
+  Loader2,
+  Search
 } from 'lucide-react'
 
 export default function InventoryManager() {
   const [movements, setMovements] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('all')
 
   async function loadMovements() {
     try {
@@ -38,6 +41,55 @@ export default function InventoryManager() {
   useEffect(() => {
     loadMovements()
   }, [])
+
+  const stats = useMemo(() => {
+    const stockIn = movements.filter(
+      movement => movement.type === 'in'
+    )
+
+    const stockOut = movements.filter(
+      movement => movement.type === 'out'
+    )
+
+    const totalIn = stockIn.reduce(
+      (total, movement) => total + movement.quantity,
+      0
+    )
+
+    const totalOut = stockOut.reduce(
+      (total, movement) => total + movement.quantity,
+      0
+    )
+
+    return {
+      totalMovements: movements.length,
+      stockIn: stockIn.length,
+      stockOut: stockOut.length,
+      totalUnits: totalIn + totalOut
+    }
+  }, [movements])
+
+  const filteredMovements = useMemo(() => {
+    return movements.filter(movement => {
+      const productName =
+        movement.product?.name?.toLowerCase() || ''
+
+      const sku =
+        movement.product?.sku?.toLowerCase() || ''
+
+      const searchValue = search.toLowerCase()
+
+      const matchesSearch =
+        productName.includes(searchValue) ||
+        sku.includes(searchValue)
+
+      const matchesFilter =
+        filter === 'all' ||
+        movement.type === filter
+
+      return matchesSearch && matchesFilter
+    })
+  }, [movements, search, filter])
 
   function formatDate(date) {
     return new Date(date).toLocaleString()
@@ -72,6 +124,126 @@ export default function InventoryManager() {
         </div>
       )}
 
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+          <p className="text-sm text-zinc-500">
+            Total Movements
+          </p>
+
+          <p className="mt-2 text-3xl font-semibold text-white">
+            {stats.totalMovements}
+          </p>
+
+          <p className="mt-2 text-xs text-zinc-600">
+            All inventory activity
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-zinc-500">
+                Stock In
+              </p>
+
+              <p className="mt-2 text-3xl font-semibold text-white">
+                {stats.stockIn}
+              </p>
+            </div>
+
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+              <ArrowDownToLine size={20} />
+            </div>
+          </div>
+
+          <p className="mt-2 text-xs text-zinc-600">
+            Incoming movements
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-zinc-500">
+                Stock Out
+              </p>
+
+              <p className="mt-2 text-3xl font-semibold text-white">
+                {stats.stockOut}
+              </p>
+            </div>
+
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10 text-orange-400">
+              <ArrowUpFromLine size={20} />
+            </div>
+          </div>
+
+          <p className="mt-2 text-xs text-zinc-600">
+            Outgoing movements
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-zinc-500">
+                Units Moved
+              </p>
+
+              <p className="mt-2 text-3xl font-semibold text-white">
+                {stats.totalUnits}
+              </p>
+            </div>
+
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400">
+              <ClipboardList size={20} />
+            </div>
+          </div>
+
+          <p className="mt-2 text-xs text-zinc-600">
+            Total units processed
+          </p>
+        </div>
+      </div>
+
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Search
+            size={18}
+            className="absolute left-4 top-3.5 text-zinc-600"
+          />
+
+          <input
+            value={search}
+            onChange={event =>
+              setSearch(event.target.value)
+            }
+            placeholder="Search by product or SKU..."
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-3 pl-11 pr-4 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-indigo-500"
+          />
+        </div>
+
+        <select
+          value={filter}
+          onChange={event =>
+            setFilter(event.target.value)
+          }
+          className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-300 outline-none focus:border-indigo-500"
+        >
+          <option value="all">
+            All Movements
+          </option>
+
+          <option value="in">
+            Stock In
+          </option>
+
+          <option value="out">
+            Stock Out
+          </option>
+        </select>
+      </div>
+
       {movements.length === 0 ? (
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 py-20 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-indigo-600/10 text-indigo-400">
@@ -84,6 +256,21 @@ export default function InventoryManager() {
 
           <p className="mt-2 text-sm text-zinc-500">
             Stock movements will appear here once you update product inventory.
+          </p>
+        </div>
+      ) : filteredMovements.length === 0 ? (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 py-16 text-center">
+          <Search
+            size={30}
+            className="mx-auto text-zinc-700"
+          />
+
+          <h2 className="mt-4 text-lg font-semibold text-white">
+            No matching movements
+          </h2>
+
+          <p className="mt-2 text-sm text-zinc-500">
+            Try changing your search or filter.
           </p>
         </div>
       ) : (
@@ -119,8 +306,9 @@ export default function InventoryManager() {
               </thead>
 
               <tbody>
-                {movements.map(movement => {
-                  const isStockIn = movement.type === 'in'
+                {filteredMovements.map(movement => {
+                  const isStockIn =
+                    movement.type === 'in'
 
                   return (
                     <tr
@@ -130,7 +318,8 @@ export default function InventoryManager() {
                       <td className="px-6 py-4">
                         <div>
                           <p className="text-sm font-medium text-white">
-                            {movement.product?.name || 'Deleted Product'}
+                            {movement.product?.name ||
+                              'Deleted Product'}
                           </p>
 
                           <p className="mt-1 text-xs text-zinc-500">
@@ -153,7 +342,9 @@ export default function InventoryManager() {
                             <ArrowUpFromLine size={14} />
                           )}
 
-                          {isStockIn ? 'Stock In' : 'Stock Out'}
+                          {isStockIn
+                            ? 'Stock In'
+                            : 'Stock Out'}
                         </div>
                       </td>
 
